@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>YouTube to Safari</h1>
+    <p>Click YouTube video links to open in Safari</p>
+
+    <div class="toggle-container">
+      <label class="toggle">
+        <input type="checkbox" id="enabled" checked>
+        <span class="slider"></span>
+      </label>
+      <span id="status">Enabled</span>
+    </div>
+
+    <div class="info">
+      <strong>Supported URLs:</strong>
+      <ul>
+        <li>youtube.com/watch?v=...</li>
+        <li>youtu.be/...</li>
+      </ul>
+      <p class="note">Shorts are NOT redirected</p>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
