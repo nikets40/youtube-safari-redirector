@@ -15,6 +15,15 @@ body {
   padding: 20px;
 }
 
+.hidden {
+  visibility: hidden;
+}
+
+.no-transition .slider,
+.no-transition .slider:before {
+  transition: none !important;
+}
+
 h1 {
   font-size: 16px;
   margin-bottom: 8px;
