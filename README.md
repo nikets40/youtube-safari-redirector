@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon128.png" width="64" height="64" alt="Logo">
+</p>
+
 # YouTube to Safari Redirector
 
 A Chrome extension that redirects YouTube video links to Safari using a custom URL scheme.
