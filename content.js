@@ -11,13 +11,9 @@ function isYouTubeVideo(url) {
   return true;
 }
 
-function openInSafari(url, closeTab = false) {
+function openInSafari(url) {
   const cleanUrl = url.replace(/^https?:\/\//, '');
   window.location.href = `openinsafari://${cleanUrl}`;
-
-  if (closeTab) {
-    chrome.runtime.sendMessage({ action: 'closeThisTab' });
-  }
 }
 
 document.addEventListener('click', (e) => {
@@ -30,19 +26,38 @@ document.addEventListener('click', (e) => {
   if (link && isYouTubeVideo(link.href)) {
     e.preventDefault();
     e.stopPropagation();
-    openInSafari(link.href);
+
+    chrome.runtime.sendMessage({ action: 'shouldRedirect', url: link.href }, (response) => {
+      if (response && response.shouldRedirect) {
+        openInSafari(link.href);
+      } else {
+        window.location.href = link.href;
+      }
+    });
   }
 }, true);
 
 function checkCurrentUrl() {
   if (isYouTubeVideo(window.location.href)) {
-    chrome.runtime.sendMessage({ action: 'checkPending' }, (response) => {
-      if (response && response.pending) {
+    chrome.runtime.sendMessage({ action: 'shouldRedirect', url: window.location.href }, (response) => {
+      if (!response || !response.shouldRedirect) {
         return;
       }
-      setTimeout(() => {
-        openInSafari(window.location.href, true);
-      }, 500);
+
+      if (response.pending) {
+        return;
+      }
+
+      if (response.closeTab) {
+        setTimeout(() => {
+          openInSafari(window.location.href);
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ action: 'closeThisTab' });
+          }, 200);
+        }, 500);
+      } else {
+        openInSafari(window.location.href);
+      }
     });
   }
 }

@@ -11,7 +11,22 @@ function isYouTubeVideo(url) {
   return true;
 }
 
+function cleanUrl(url) {
+  return url.replace(/^https?:\/\//, '');
+}
+
 const pendingRedirectTabs = new Map();
+let isEnabled = true;
+
+chrome.storage.local.get(['enabled'], (result) => {
+  isEnabled = result.enabled !== false;
+});
+
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.enabled) {
+    isEnabled = changes.enabled.newValue !== false;
+  }
+});
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -26,39 +41,42 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (!isEnabled) return;
+
   if (info.menuItemId === 'openInSafari' && info.linkUrl) {
-    const cleanUrl = info.linkUrl.replace(/^https?:\/\//, '');
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: (url) => {
         window.location.href = `openinsafari://${url}`;
       },
-      args: [cleanUrl]
+      args: [cleanUrl(info.linkUrl)]
     });
   }
 });
 
 chrome.webNavigation.onCreatedNavigationTarget.addListener((details) => {
+  if (!isEnabled) return;
+
   if (details.url && isYouTubeVideo(details.url)) {
     pendingRedirectTabs.set(details.tabId, details.url);
   }
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
+  if (!isEnabled) return;
+
   const tabId = activeInfo.tabId;
 
   if (pendingRedirectTabs.has(tabId)) {
     const url = pendingRedirectTabs.get(tabId);
     pendingRedirectTabs.delete(tabId);
 
-    const cleanUrl = url.replace(/^https?:\/\//, '');
-
     chrome.scripting.executeScript({
       target: { tabId: tabId },
       func: (safariUrl) => {
         window.location.href = safariUrl;
       },
-      args: [`openinsafari://${cleanUrl}`]
+      args: [`openinsafari://${cleanUrl(url)}`]
     }).then(() => {
       setTimeout(() => {
         chrome.tabs.remove(tabId);
@@ -68,12 +86,18 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'checkPending') {
+  if (message.action === 'shouldRedirect') {
+    if (!isEnabled) {
+      sendResponse({ shouldRedirect: false });
+      return true;
+    }
+
     const tabId = sender.tab?.id;
+
     if (tabId && pendingRedirectTabs.has(tabId)) {
-      sendResponse({ pending: true, url: pendingRedirectTabs.get(tabId) });
+      sendResponse({ shouldRedirect: true, pending: true });
     } else {
-      sendResponse({ pending: false });
+      sendResponse({ shouldRedirect: true, pending: false, closeTab: true });
     }
     return true;
   }
@@ -90,16 +114,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.webNavigation.onCommitted.addListener((details) => {
+  if (!isEnabled) return;
+
   if (details.frameId === 0 && details.transitionType === 'address_bar') {
     const url = details.url;
     if (isYouTubeVideo(url) && !pendingRedirectTabs.has(details.tabId)) {
-      const cleanUrl = url.replace(/^https?:\/\//, '');
       chrome.scripting.executeScript({
         target: { tabId: details.tabId },
         func: (safariUrl) => {
           window.location.href = safariUrl;
         },
-        args: [`openinsafari://${cleanUrl}`]
+        args: [`openinsafari://${cleanUrl(url)}`]
       }).then(() => {
         setTimeout(() => {
           chrome.tabs.remove(details.tabId);
